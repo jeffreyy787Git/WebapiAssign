@@ -1,0 +1,85 @@
+openapi: 3.0.0
+info:   
+  version: 1.0.0   
+  title: Back End Demonstration API
+  description: A simple blog API.
+  contact:     
+    name: CY Cheng
+    email: cycheng@vtc.edu.hk
+  license:
+    name: Apache 2.0
+    url: 'https://www.apache.org/licenses/LICENSE-2.0.html'
+servers:   
+  - url: 'https://33685546-3a45-4c69-9908-28de36548ddf-00-2t7ws6vqhwtme.kirk.repl.co/api/v1/'     
+    description: Development server
+tags:
+  - name: Users
+    description: API endpoints for user management
+  - name: Articles
+    description: Access and perform CRUD operations for blog
+paths:
+  /articles/{id}:
+    parameters:
+      - in: path
+        name: id
+        schema: 
+          type: integer
+        required: true
+        description: Numeric id of the article
+    get:
+      tags:
+        - Articles
+      description:
+        get article by id
+      responses:
+        '200':
+          description: View of an article record
+        '404':
+          description: Article not found
+    put:
+      tags:
+        - Articles
+      description:
+        update the article by id
+      responses:
+        '201':
+          description: Update Successfully
+        '404':
+          description: Article not found
+    delete:
+      tags:
+        - Articles
+      description:
+        Delete article by ID.
+      responses:
+        '200':
+          description: View of an article record.
+        '404':
+          description: Article was not found in the DB.
+  /articles:
+    get:
+     tags:
+     - Articles
+     description: Get all articles
+     responses:
+      '200':
+       description: OK
+      '404':
+       description: Not Found  
+    post:
+      tags:
+        - Articles
+      description:
+        Create an article
+      requestBody:
+        description: Article in JSON format
+        required: true
+        content:
+          application/json:
+            schema: 
+              $ref: ./article.json#/definitions/article
+      responses:
+        '201':
+          description: an article added
+        '400':
+          description: Bad request
