@@ -1,8 +1,8 @@
 import React from 'react';
-import Article from './Articles.tsx'
+import HotelPage from './Articles.tsx'
 
 const Home = () => {
-  return <Article/>;
+  return <HotelPage/>;
 }
 
 export default Home;

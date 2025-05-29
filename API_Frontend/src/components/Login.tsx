@@ -1,6 +1,6 @@
 import React, { useState, useContext } from 'react';
 import { Form, Input, Button, message } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Buffer } from 'buffer';
 import { AuthContext } from './AuthContext';
 import axios from 'axios';
@@ -60,10 +60,9 @@ const Login: React.FC = () => {
   };
 
   return (
-    <Form
+    <Form 
+      requiredMark={false}
       name="login"
-      labelCol={{ span: 8 }}
-      wrapperCol={{ span: 16 }}
       initialValues={{ remember: true }}
       onFinish={onFinish}
       onFinishFailed={onFinishFailed}
@@ -86,13 +85,15 @@ const Login: React.FC = () => {
         <Input.Password />
       </Form.Item>
 
-      <Form.Item wrapperCol={{ offset: 8, span: 16 }}>
-        <Button type="primary" htmlType="submit" loading={loading}>
+      <Form.Item>
+        <Button type="primary" htmlType="submit" loading={loading} style={{ width: '100%' }}>
           Login
         </Button>
       </Form.Item>
+      <div style={{ textAlign: 'center' }}>
+        Do not have an account? <Link to="/register">Go to register</Link>
+      </div>
     </Form>
   );
 };
-
 export default Login; 

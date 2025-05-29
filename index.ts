@@ -7,8 +7,8 @@ import passport from "koa-passport";
 import cors from '@koa/cors' ;
 import { router as articles } from "./routes/articles";
 import { router as special } from "./routes/specials";
-import { router as users } from "./routes/users";
 import { router as auth } from "./routes/auth";
+import { router as proxy} from "./routes/proxy";
 import serve from 'koa-static';
 
 
@@ -31,10 +31,9 @@ app.use(router.routes());
 //app.use(articles.routes());
 app.use(passport.initialize());
 app.use(auth.routes()).use(auth.allowedMethods());
-app.use(users.routes()).use(users.allowedMethods());
 app.use(special.routes()).use(special.allowedMethods());
 app.use(articles.routes()).use(articles.allowedMethods());
-
+app.use(proxy.routes()).use(proxy.allowedMethods());
 app.use(async (ctx: RouterContext, next: any) => {
   try {
     await next();
