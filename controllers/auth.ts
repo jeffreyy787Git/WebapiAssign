@@ -3,6 +3,14 @@ import { BasicStrategy } from "passport-http";
 import { RouterContext } from "koa-router";
 import * as users from '../models/users.model';
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs';
+
+const avatarUploadPathForController = path.join(process.cwd(), 'uploads', 'avatars');
+
+if (!fs.existsSync(avatarUploadPathForController)) {
+  fs.mkdirSync(avatarUploadPathForController, { recursive: true });
+}
 
 interface UserWithSensitiveInfo extends users.User {
     password?: string;
@@ -89,7 +97,8 @@ export const register = async (ctx: RouterContext) => {
       username: username,
       email: email,
       passwordhash: hashedPassword,
-      passwordsalt: salt
+      passwordsalt: salt,
+      roles: 'normal_user'
     });
 
     let userToReturn: UserWithSensitiveInfo | null = null;
@@ -107,7 +116,7 @@ export const register = async (ctx: RouterContext) => {
       delete userToReturn.passwordsalt;
 
       ctx.status = 201;
-      ctx.body = { message: "User registered successfully", user: userToReturn }; // userToReturn is now clean
+      ctx.body = { message: "User registered successfully", user: userToReturn };
     } else {
       console.error("User creation result was not as expected or indicated failure:", creationResult);
       throw new Error("User creation did not return expected user data.");
@@ -130,5 +139,106 @@ export const verifyLogin = async (ctx: RouterContext) => {
     console.error('[verifyLogin] ctx.state.user is not set after basicAuth. This should not happen.');
     ctx.status = 401;
     ctx.body = { message: "Verification failed. Credentials may be invalid or an internal error occurred." };
+  }
+};
+
+export const updateAvatar = async (ctx: RouterContext) => {
+  const fileFromRequest = ctx.request.files?.avatar as any;
+
+  console.log('Entering updateAvatar with koa-body. ctx.request.body:', ctx.request.body);
+  console.log('Entering updateAvatar with koa-body. ctx.request.files:', ctx.request.files);
+  console.log('File object (avatar from request): ', fileFromRequest);
+
+  if (!ctx.state.user || !ctx.state.user.id) {
+    ctx.status = 401;
+    ctx.body = { message: "User not authenticated" };
+    if (fileFromRequest && fileFromRequest.filepath && fs.existsSync(fileFromRequest.filepath)) {
+        fs.unlink(fileFromRequest.filepath, err => { if(err) console.error("Error deleting orphaned temp file (auth fail, koa-body):", err); });
+    }
+    return;
+  }
+
+  const actualFile = Array.isArray(fileFromRequest) ? fileFromRequest[0] : fileFromRequest;
+
+  if (!actualFile || !actualFile.filepath) {
+    ctx.status = 400;
+    ctx.body = { message: "No file uploaded or file path missing (using koa-body)." };
+    return;
+  }
+
+  let oldAvatarSystemPath: string | null = null;
+  const userId = ctx.state.user.id;
+
+  try {
+    const currentUserDataArray = await users.findByUsername(ctx.state.user.username);
+    if (currentUserDataArray.length > 0) {
+      const currentUserData = currentUserDataArray[0] as users.User;
+      if (currentUserData.avatarurl && currentUserData.avatarurl.startsWith('/uploads/avatars/')) {
+        oldAvatarSystemPath = path.join(process.cwd(), currentUserData.avatarurl);
+        console.log(`Old avatar system path to be deleted: ${oldAvatarSystemPath}`);
+      }
+    }
+  } catch (e: any) {
+    console.error("Error fetching user data for old avatar deletion:", e.message);
+  }
+
+  const tempPath = actualFile.filepath;
+  const originalFilename = actualFile.originalFilename || actualFile.name || 'unknown.tmp'; 
+  const originalExt = path.extname(originalFilename);
+  const newFileName = `user-${userId}-${Date.now()}${originalExt}`;
+  const newPath = path.join(avatarUploadPathForController, newFileName);
+
+  try {
+    await fs.promises.rename(tempPath, newPath);
+
+    const avatarUrl = `/uploads/avatars/${newFileName}`;
+
+    const updateResult = await users.updateUserAvatar(userId, avatarUrl);
+    
+    let updatedUser: users.User | null = null;
+    if (Array.isArray(updateResult) && updateResult.length > 0) {
+        updatedUser = updateResult[0] as users.User;
+    } else if (updateResult && typeof updateResult === 'object' && !Array.isArray(updateResult) && Object.keys(updateResult).length > 0){
+        updatedUser = updateResult as users.User;
+    }
+
+    if (updatedUser) {
+      const { password, passwordsalt, ...secureUser } = updatedUser as any;
+      ctx.status = 200;
+      ctx.body = { message: "Avatar updated successfully", user: secureUser };
+
+      if (oldAvatarSystemPath && fs.existsSync(oldAvatarSystemPath)) {
+        const newAvatarSystemPath = newPath; 
+        if (oldAvatarSystemPath !== newAvatarSystemPath) {
+          console.log(`Attempting to delete old avatar: ${oldAvatarSystemPath}`);
+          fs.unlink(oldAvatarSystemPath, (err) => {
+            if (err) {
+              console.error("Failed to delete old avatar:", oldAvatarSystemPath, err);
+            } else {
+              console.log("Successfully deleted old avatar:", oldAvatarSystemPath);
+            }
+          });
+        }
+      } else if (oldAvatarSystemPath) {
+        console.log("Old avatar path was determined, but file does not exist (or was already deleted):", oldAvatarSystemPath);
+      }
+
+    } else {
+      console.error("DB Avatar update did not return expected user data (koa-body) for ID:", userId);
+      if (fs.existsSync(newPath)) {
+        fs.unlink(newPath, err => { if (err) console.error("Error deleting newly uploaded file after DB update failure (koa-body):", err);});
+      }
+      ctx.status = 404; 
+      ctx.body = { message: "Failed to update avatar in DB or retrieve user (koa-body)." };
+    }
+  } catch (error: any) {
+    console.error("Error during avatar update (koa-body - rename or DB):", error);
+    if (fs.existsSync(tempPath) && (!fs.existsSync(newPath) || tempPath !== newPath) ) { 
+      fs.unlink(tempPath, (unlinkErr) => {
+        if (unlinkErr) console.error("Error deleting temp file after caught error (koa-body):", unlinkErr);
+      });
+    }
+    ctx.status = 500;
+    ctx.body = { message: "Error updating avatar (koa-body)", error: error.message };
   }
 };

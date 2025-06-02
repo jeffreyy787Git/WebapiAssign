@@ -10,6 +10,7 @@ import DetailArticle from './components/DetailArticle';
 import NewArticles from './components/NewArticles';
 import Login from './components/Login';
 import Register from './components/Register';
+import Profile from './components/Profile';
 import { AuthProvider, AuthContext } from './components/AuthContext';
 
 const { Header, Content, Footer } = Layout;
@@ -49,6 +50,7 @@ const Navigation: React.FC = () => {
         {isAuthenticated ? (
           <>
             <Link to="/newarticle">New</Link>
+            <Link to="/profile">Profile</Link>
             <Link to="/" onClick={handleLogout}>Logout</Link>
           </>
         ) : (
@@ -85,6 +87,7 @@ export default function App() {
                   </ProtectedRoute>
                 } 
               />
+              <Route path="/profile" element={<Profile />} />
             </Routes>
           </div>
         </Content>

@@ -17,16 +17,23 @@ export const findByUsername = async (username: string): Promise<any[]> => {
   return users;
 };
 
-interface CreateUserParams {
+export interface CreateUserParams {
   username: string;
   email: string;
   passwordhash: string;
   passwordsalt: string;
+  roles: string;
 }
 
 export const createUser = async (userData: CreateUserParams): Promise<User[] | any> => {
-  const { username, email, passwordhash, passwordsalt } = userData;
-  const query = "INSERT INTO users (username, email, password, passwordsalt, dateregistered) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl";
-  const result = await db.run_query(query, [username, email, passwordhash, passwordsalt]);
+  const { username, email, passwordhash, passwordsalt, roles } = userData;
+  const query = "INSERT INTO users (username, email, password, passwordsalt, roles, dateregistered) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles";
+  const result = await db.run_query(query, [username, email, passwordhash, passwordsalt, roles]);
+  return result;
+};
+
+export const updateUserAvatar = async (userId: number, avatarUrl: string): Promise<any> => {
+  const query = "UPDATE users SET avatarurl = ? WHERE id = ? RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles";
+  const result = await db.run_query(query, [avatarUrl, userId]);
   return result;
 };
