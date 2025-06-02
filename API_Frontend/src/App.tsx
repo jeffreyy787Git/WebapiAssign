@@ -5,12 +5,12 @@ import React, { useContext } from 'react';
 //import Landing from "./components/Landing"
 import Home from './components/Home';
 import Dashboard from './components/Dashboard';
-import About from './components/About';
 import DetailArticle from './components/DetailArticle';
 import NewArticles from './components/NewArticles';
 import Login from './components/Login';
 import Register from './components/Register';
 import Profile from './components/Profile';
+import Favourites from './components/Favourites';
 import { AuthProvider, AuthContext } from './components/AuthContext';
 
 const { Header, Content, Footer } = Layout;
@@ -46,9 +46,9 @@ const Navigation: React.FC = () => {
       <Space>
         <Link to="/">Home</Link>
         <Link to="/dashboard">Dashboard</Link>
-        <Link to="/about">About</Link>
         {isAuthenticated ? (
           <>
+            <Link to="/favourites">Favourites</Link>
             <Link to="/newarticle">New</Link>
             <Link to="/profile">Profile</Link>
             <Link to="/" onClick={handleLogout}>Logout</Link>
@@ -77,7 +77,6 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />}  />  
-              <Route path="/about" element={<About />}  />
               <Route path="/a/:aid" element = {<DetailArticle /> } />
               <Route 
                 path="/newarticle" 
@@ -88,6 +87,7 @@ export default function App() {
                 } 
               />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/favourites" element={<Favourites />} />
             </Routes>
           </div>
         </Content>

@@ -3,11 +3,15 @@ import { api } from './common/http-common';
 import axios from 'axios';
 
 export interface User {
-  id?: number;
+  id: number;
   username: string;
   email: string;
+  firstname?: string | null;
+  lastname?: string | null;
+  about?: string | null;
   avatarurl?: string | null;
-  roles: string;
+  roles?: string;
+  favourite_hotels?: number[];
 }
 
 interface VerifyAuthResponse {
@@ -21,6 +25,7 @@ interface AuthContextType {
   user: User | null;
   setUser: (user: User | null) => void;
   logout: () => void;
+  isVerifying: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,10 +35,9 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return !!localStorage.getItem('atoken');
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('atoken'));
   const [user, setUserState] = useState<User | null>(null);
+  const [isVerifying, setIsVerifying] = useState<boolean>(true);
 
   const setUser = (userData: User | null) => {
     setUserState(userData);
@@ -43,36 +47,48 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem('atoken');
     setIsAuthenticated(false);
     setUser(null);
+    setIsVerifying(false);
   };
 
   useEffect(() => {
     const token = localStorage.getItem('atoken');
-    if (token && isAuthenticated && !user) {
+    if (token) {
+      setIsVerifying(true);
       axios.get<VerifyAuthResponse>(`${api.uri}/auth/verify`, {
         headers: { 'Authorization': `Basic ${token}` }
       })
       .then(response => {
         if (response.data && response.data.user) {
           setUser(response.data.user);
+          setIsAuthenticated(true);
         } else {
           logout();
         }
+        setIsVerifying(false);
       })
       .catch(() => {
         logout();
+        setIsVerifying(false);
       });
-    } else if (!isAuthenticated && user) {
+    } else {
+      setIsAuthenticated(false);
+      setUser(null);
+      setIsVerifying(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated && user) {
         setUser(null);
     }
   }, [isAuthenticated, user]);
 
   useEffect(() => {
-    console.log('Authentication state changed:', isAuthenticated);
-    console.log('User context state:', user);
-  }, [isAuthenticated, user]);
+    console.log('[AuthProvider] State Change: isVerifying:', isVerifying, 'isAuthenticated:', isAuthenticated, 'User:', user ? user.username : null);
+  }, [isVerifying, isAuthenticated, user]);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated, user, setUser, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated, user, setUser, logout, isVerifying }}>
       {children}
     </AuthContext.Provider>
   );

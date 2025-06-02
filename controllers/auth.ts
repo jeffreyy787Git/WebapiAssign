@@ -5,6 +5,7 @@ import * as users from '../models/users.model';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
+import * as hotels from '../models/hotels.model';
 
 const avatarUploadPathForController = path.join(process.cwd(), 'uploads', 'avatars');
 
@@ -240,5 +241,109 @@ export const updateAvatar = async (ctx: RouterContext) => {
     }
     ctx.status = 500;
     ctx.body = { message: "Error updating avatar (koa-body)", error: error.message };
+  }
+};
+
+export const getFavouriteHotels = async (ctx: RouterContext) => {
+  if (!ctx.state.user || !ctx.state.user.id) {
+    ctx.status = 401;
+    ctx.body = { message: "User not authenticated" };
+    return;
+  }
+  const userId = ctx.state.user.id;
+  try {
+    const userFromState = ctx.state.user as users.User; 
+
+    if (userFromState && userFromState.favourite_hotels && userFromState.favourite_hotels.length > 0) {
+      const favouriteHotelDetails = await hotels.findHotelsByCodes(userFromState.favourite_hotels);
+      ctx.status = 200;
+      ctx.body = { favouriteHotels: favouriteHotelDetails };
+    } else {
+      ctx.status = 200; 
+      ctx.body = { favouriteHotels: [] };
+    }
+  } catch (error: any) {
+    console.error("Error fetching favourite hotels for user:", userId, error);
+    ctx.status = 500;
+    ctx.body = { message: "Error fetching favourite hotels", error: error.message };
+  }
+};
+
+export const addFavouriteHotel = async (ctx: RouterContext) => {
+  if (!ctx.state.user || !ctx.state.user.id) {
+    ctx.status = 401;
+    ctx.body = { message: "User not authenticated" };
+    return;
+  }
+  const userId = ctx.state.user.id;
+  const { hotelCode } = ctx.request.body as { hotelCode?: number };
+
+  if (typeof hotelCode !== 'number') {
+    ctx.status = 400;
+    ctx.body = { message: "hotelCode (number) is required in the request body." };
+    return;
+  }
+
+  try {
+    const updatedUser = await users.addHotelToFavourites(userId, hotelCode);
+    if (updatedUser) {
+      const { password, passwordsalt, ...secureUser } = updatedUser as any;
+      ctx.status = 200;
+      ctx.body = { message: "Hotel added to favourites", user: secureUser };
+    } else {
+      ctx.status = 404;
+      ctx.body = { message: "Failed to add hotel to favourites or user not found." };
+    }
+  } catch (error: any) {
+    console.error("Error adding hotel to favourites:", userId, hotelCode, error);
+    ctx.status = 500;
+    ctx.body = { message: "Error adding hotel to favourites", error: error.message };
+  }
+};
+
+export const removeFavouriteHotel = async (ctx: RouterContext) => {
+  if (!ctx.state.user || !ctx.state.user.id) {
+    ctx.status = 401;
+    ctx.body = { message: "User not authenticated" };
+    return;
+  }
+  const userId = ctx.state.user.id;
+  const hotelCodeParam = ctx.params.hotelCode;
+  const hotelCode = parseInt(hotelCodeParam, 10);
+
+  if (isNaN(hotelCode)) {
+    ctx.status = 400;
+    ctx.body = { message: "Valid hotelCode (number) is required as a URL parameter." };
+    return;
+  }
+
+  try {
+    const updatedUser = await users.removeHotelFromFavourites(userId, hotelCode);
+    if (updatedUser) {
+      const { password, passwordsalt, ...secureUser } = updatedUser as any;
+      ctx.status = 200;
+      ctx.body = { message: "Hotel removed from favourites", user: secureUser };
+    } else {
+      ctx.status = 404;
+      ctx.body = { message: "Failed to remove hotel from favourites, user not found, or hotel not in favourites." };
+    }
+  } catch (error: any) {
+    console.error("Error removing hotel from favourites:", userId, hotelCode, error);
+    ctx.status = 500;
+    ctx.body = { message: "Error removing hotel from favourites", error: error.message };
+  }
+};
+
+export const loginController = async (ctx: RouterContext) => {
+  if (ctx.state.user) {
+    ctx.status = 200;
+    ctx.body = {
+      message: "Login successful",
+      user: ctx.state.user 
+    };
+  } else {
+    console.error('[loginController] ctx.state.user is not set after basicAuth. This implies an issue or direct call without auth.');
+    ctx.status = 401;
+    ctx.body = { message: "Login failed: Authentication unsuccessful or user data not available." };
   }
 };

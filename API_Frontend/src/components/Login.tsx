@@ -2,18 +2,13 @@ import React, { useState, useContext } from 'react';
 import { Form, Input, Button, message } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
 import { Buffer } from 'buffer';
-import { AuthContext, User as AuthUser } from './AuthContext';
 import axios from 'axios';
+import { AuthContext, User as AuthUser } from './AuthContext';
 import { api } from './common/http-common';
 
-interface VerifyAuthResponse {
+interface LoginResponse {
   message: string;
   user: AuthUser;
-}
-
-interface ApiErrorData {
-  message: string;
-  error?: any;
 }
 
 const Login: React.FC = () => {
@@ -39,11 +34,15 @@ const Login: React.FC = () => {
     const token = Buffer.from(`${username}:${password}`, 'utf8').toString('base64');
 
     try {
-      const response = await axios.get<VerifyAuthResponse>(`${api.uri}/auth/verify`, {
-        headers: {
-          'Authorization': `Basic ${token}`
+      const response = await axios.post<LoginResponse>(
+        `${api.uri}/auth/login`, 
+        {},
+        {
+          headers: {
+            'Authorization': `Basic ${token}`
+          }
         }
-      });
+      );
 
       if (response.status === 200 && response.data && response.data.user) {
         localStorage.setItem('atoken', token);
@@ -51,7 +50,7 @@ const Login: React.FC = () => {
         if (setUser) {
             setUser(response.data.user);
         } else {
-            console.warn("AuthContext.setUser is not available. User role might not be properly set.")
+            console.warn("AuthContext.setUser is not available. User context might not be properly set.");
         }
         message.success(response.data.message || 'Login successful');
         navigate('/');
@@ -60,14 +59,16 @@ const Login: React.FC = () => {
         message.error(errorData?.message || 'Login failed: Unexpected server response.');
       }
     } catch (error: any) {
-      if (error && error.isAxiosError && error.response) {
-        const errorData = error.response.data;
-        message.error(errorData?.message || 'Login failed: Unexpected server response.');
-      } else if (error && error.request) {
-        message.error('Login failed: No response from server or network error.');
+      if (error.isAxiosError === true) {
+        if (error.response) {
+          const errorData = error.response.data as { message?: string };
+          message.error(errorData?.message || `Login failed: ${error.response.status} ${error.response.statusText}`);
+        } else if (error.request) {
+          message.error('Login failed: No response from server. Check network connection.');
+        }
       } else {
-        message.error('Login attempt failed. Please check your connection and try again.');
-        console.error("Login API error (non-Axios):", error);
+        message.error('Login attempt failed. Please check your input or network connection.');
+        console.error("Login API error (not an Axios error or request setup issue):", error.message ? error.message : error);
       }
     }
     setLoading(false);
@@ -75,7 +76,7 @@ const Login: React.FC = () => {
 
   const onFinishFailed = (errorInfo: any) => {
     console.log('Failed:', errorInfo);
-    message.error('Login failed, please check your input');
+    message.error('Login failed: Please check your input fields for errors.');
   };
 
   return (

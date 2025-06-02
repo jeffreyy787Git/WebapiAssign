@@ -365,6 +365,39 @@ export const getAllFullHotelsData = async (): Promise<FullHotelData[]> => {
     }
 };
 
+export const findHotelsByCodes = async (hotelCodes: number[]): Promise<FullHotelData[]> => {
+  if (!hotelCodes || hotelCodes.length === 0) {
+    return [];
+  }
+  const client = await pool.connect();
+  try {
+    const query = `SELECT * FROM hotels WHERE code = ANY($1::int[]) ORDER BY name ASC`;
+    const hotelsResult = await client.query(query, [hotelCodes]);
+    const dbHotels: DbHotel[] = hotelsResult.rows;
+
+    if (dbHotels.length === 0) {
+      return [];
+    }
+
+    const fullHotelsData: FullHotelData[] = [];
+    for (const hotel of dbHotels) {
+      const images = await getImagesForHotel(hotel.code);
+      const roomsWithRates = await getRoomsAndRatesForHotel(hotel.code);
+      fullHotelsData.push({
+        ...hotel,
+        images,
+        rooms: roomsWithRates,
+      });
+    }
+    return fullHotelsData;
+  } catch (error) {
+    console.error("Error finding hotels by codes:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
+};
+
 export const createHotelEntry = async (hotelData: Omit<DbHotel, 'last_updated'>): Promise<DbHotel> => {
     const client = await pool.connect();
     try {
