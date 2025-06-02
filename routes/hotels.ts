@@ -4,7 +4,7 @@ import { isAdmin, getHotelsFromDB, refreshHotelsData, createHotel, updateHotel, 
 
 const router = new Router({ prefix: '/api/v1/db/hotels' });
 
-router.get('/', basicAuth, getHotelsFromDB);
+router.get('/', getHotelsFromDB);
 
 router.post('/refresh', basicAuth, isAdmin, refreshHotelsData);
 

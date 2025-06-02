@@ -308,4 +308,31 @@ export const handleUpdateThreadStatus = async (ctx: RouterContext) => {
         ctx.status = 500;
         ctx.body = { message: "An internal error occurred while updating thread status.", error: error.message };
     }
+};
+
+export const handleDeleteMessageAsAdmin = async (ctx: RouterContext) => {
+    const messageIdParam = ctx.params.messageId;
+    const messageId = parseInt(messageIdParam, 10);
+
+    if (isNaN(messageId)) {
+        ctx.status = 400;
+        ctx.body = { message: "Invalid message ID parameter." };
+        return;
+    }
+
+    try {
+        const success = await msgModel.deleteMessageAsAdmin(messageId);
+
+        if (success) {
+            ctx.status = 200;
+            ctx.body = { message: `Message ${messageId} deleted successfully by admin.` };
+        } else {
+            ctx.status = 404; 
+            ctx.body = { message: `Failed to delete message ${messageId}. It might not exist.` };
+        }
+    } catch (error: any) {
+        console.error(`Error in handleDeleteMessageAsAdmin (messageId: ${messageId}):`, error);
+        ctx.status = 500;
+        ctx.body = { message: "An internal error occurred while deleting the message.", error: error.message };
+    }
 }; 

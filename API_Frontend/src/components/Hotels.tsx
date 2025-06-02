@@ -107,34 +107,25 @@ const HotelPage = () => {
     return !!currentUser && !!currentUser.favourite_hotels && currentUser.favourite_hotels.includes(hotelCode);
   }, []);
 
-  const fetchHotelsFromDB = useCallback(async (token: string) => {
+  const fetchHotelsFromDB = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const response = await axios.get<DisplayableHotel[]>(dbHotelsApiUri, { headers: { 'Authorization': `Basic ${token}` } });
-      const rawHotels = await axios.get<any[]>(dbHotelsApiUri, { headers: { 'Authorization': `Basic ${token}` } });
+      const rawHotels = await axios.get<any[]>(dbHotelsApiUri);
       if (rawHotels.data) setDbHotels(rawHotels.data.map(mapRawHotelToDisplayable));
       else setDbHotels([]);
     } catch (err: any) {
       const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Failed to fetch hotels.';
       setError(errorMessage); setDbHotels(null);
-      if (err.response?.status === 401) setIsAuthenticated(false);
     } finally { setLoading(false); }
-  }, [setIsAuthenticated]);
+  }, []);
 
   useEffect(() => {
     if (isVerifying) {
       setLoading(true);
       return;
     }
-    const token = localStorage.getItem('atoken');
-    if (isAuthenticated && token) {
-      fetchHotelsFromDB(token);
-    } else if (!isAuthenticated) {
-      setError("You are not authenticated. Please login to view hotels.");
-      setLoading(false);
-      setDbHotels(null);
-    }
-  }, [isVerifying, isAuthenticated, fetchHotelsFromDB]);
+    fetchHotelsFromDB();
+  }, [isVerifying, fetchHotelsFromDB]);
 
   const showAddModal = () => { setModalMode('add'); setCurrentHotel(null); setIsModalVisible(true); };
   const showEditModal = (hotel: DisplayableHotel) => { setModalMode('edit'); setCurrentHotel(hotel); setIsModalVisible(true); };
@@ -165,7 +156,7 @@ const HotelPage = () => {
         message.success(`Hotel ${currentHotel.code} updated successfully!`);
       }
       setIsModalVisible(false); setCurrentHotel(null); 
-      if (token) fetchHotelsFromDB(token);
+      if (token) fetchHotelsFromDB();
     } catch (error: any) { 
       message.error(error.response?.data?.error || 'Failed to submit form.'); 
       console.error("Error in Modal OK:", error.response?.data || error.message);
@@ -181,7 +172,7 @@ const HotelPage = () => {
       message.info('Starting hotel data refresh...');
       const response = await axios.post<RefreshResponse>(refreshDbHotelsApiUri, {}, { headers: { 'Authorization': `Basic ${token}` } });
       message.success(response.data.message || 'Hotel data refresh initiated!');
-      if (token) await fetchHotelsFromDB(token);
+      if (token) fetchHotelsFromDB();
     } catch (err: any) {
       const errorMessageText = err.response?.data?.error || err.response?.data?.details || 'Failed to refresh hotel data.';
       setError(errorMessageText); message.error(errorMessageText);
@@ -199,7 +190,7 @@ const HotelPage = () => {
         try {
           await axios.delete(`${dbHotelsApiUri}/${hotelCode}`, { headers: { 'Authorization': `Basic ${token}` } });
           message.success(`Hotel ${hotelCode} deleted.`); 
-          if (token) fetchHotelsFromDB(token);
+          if (token) fetchHotelsFromDB();
         } catch (error: any) { 
           message.error(error.response?.data?.error || 'Failed to delete hotel.'); 
           console.error("Error deleting hotel:", error.response?.data || error.message);
@@ -209,8 +200,6 @@ const HotelPage = () => {
   };
 
   if (isVerifying) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} tip="Verifying authentication..." /></div>;
-
-  if (!isAuthenticated && !loading && !isVerifying) return <div style={{ padding: 24, textAlign: 'center' }}><Alert message="Unauthorized" description={error || "Please login to view hotels."} type="error" showIcon /></div>;
 
   if (loading && !isVerifying) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} tip="Loading hotels..." /></div>;
 
@@ -259,19 +248,21 @@ const HotelPage = () => {
                   style={{ width: '100%', boxShadow: '0 4px 8px rgba(0,0,0,0.1)' }}
                   cover={ <img alt={hotel.name} src={hotel.images && hotel.images.length > 0 && hotel.images[0]?.path ? hotel.images[0].path : 'https://via.placeholder.com/300x200.png?text=No+Image'} style={{ height: 200, objectFit: 'cover' }} onError={(e) => { const target = e.target as HTMLImageElement; if (target.src !== 'https://via.placeholder.com/300x200.png?text=Image+Error') target.src = 'https://via.placeholder.com/300x200.png?text=Image+Error'; }} /> }
                   hoverable
-                  actions={isAuthenticated ? [
-                    ...(user && user.roles && user.roles.includes('admin') ? [
+                  actions={[
+                    ...(isAuthenticated && user && user.roles && user.roles.includes('admin') ? [
                       <Tooltip title="Edit Hotel" key={`edit-${hotel.code}`}><Button icon={<EditOutlined />} onClick={() => showEditModal(hotel)} type="text" /></Tooltip>,
                       <Tooltip title="Delete Hotel" key={`delete-${hotel.code}`}><Button icon={<DeleteOutlined />} danger onClick={() => handleDeleteHotel(hotel.code)} type="text" /></Tooltip>
                     ] : []),
-                    <Tooltip title={currentlyFavourite ? "Remove from Favourites" : "Add to Favourites"} key={`fav-${hotel.code}`}>
-                      <Button
-                        icon={currentlyFavourite ? <HeartFilled style={{color: 'red'}} /> : <HeartOutlined />}
-                        onClick={() => toggleFavourite(hotel.code, currentlyFavourite, user, setUser)}
-                        type="text"
-                      />
-                    </Tooltip>
-                  ] : []}
+                    ...(isAuthenticated && user ? [
+                      <Tooltip title={currentlyFavourite ? "Remove from Favourites" : "Add to Favourites"} key={`fav-${hotel.code}`}>
+                        <Button
+                          icon={currentlyFavourite ? <HeartFilled style={{color: 'red'}} /> : <HeartOutlined />}
+                          onClick={() => toggleFavourite(hotel.code, currentlyFavourite, user, setUser)}
+                          type="text"
+                        />
+                      </Tooltip>
+                    ] : []),
+                  ]}
                 >
                   <p><strong>Category:</strong> {hotel.category_name || 'N/A'}</p>
                   <p><strong>Destination:</strong> {hotel.destination_name || 'N/A'} ({hotel.zone_name || 'N/A'})</p>

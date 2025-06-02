@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
-import { List, Typography, Spin, Alert, Button, Input, Form, message, Card, Avatar, Tooltip } from 'antd';
+import { List, Typography, Spin, Alert, Button, Input, Form, message, Card, Avatar, Tooltip, Modal } from 'antd';
 import axios from 'axios';
 import { AuthContext, User as AuthUser } from './AuthContext';
-import { ArrowLeftOutlined, SendOutlined, UserOutlined, RobotOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SendOutlined, UserOutlined, RobotOutlined, DeleteOutlined } from '@ant-design/icons';
 import moment from 'moment';
 import { api } from './common/http-common';
 
@@ -143,6 +143,38 @@ const ThreadDetailsPage: React.FC = () => {
     }
   };
 
+  const handleDeleteMessage = async (messageId: number) => {
+    const token = localStorage.getItem('atoken');
+    if (!token || !currentUserIsAdmin) {
+      message.error("Action not allowed or not authenticated as admin.");
+      return;
+    }
+    if (!threadId) {
+        message.error("Thread ID is missing, cannot refresh messages.");
+        return;
+    }
+
+    Modal.confirm({
+      title: 'Delete this message?',
+      content: `Message ID: ${messageId} will be permanently deleted.`,
+      okText: 'Delete',
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await axios.delete(`/api/v1/messaging/messages/${messageId}`, {
+            headers: { Authorization: `Basic ${token}` },
+          });
+          message.success(`Message ${messageId} deleted successfully.`);
+          fetchMessages(token, threadId);
+        } catch (err: any) {
+          console.error("Error deleting message:", err);
+          const errMsg = err.response?.data?.message || "Failed to delete message.";
+          message.error(errMsg);
+        }
+      },
+    });
+  };
+
   if (!authContext) {
     return <Alert message="AuthContext is not available." type="error" showIcon />;
   }
@@ -217,7 +249,23 @@ const ThreadDetailsPage: React.FC = () => {
                     icon={!avatarSrc ? (isSenderAdminForDisplay ? <RobotOutlined /> : <UserOutlined />) : null}
                   />
                 } 
-                title={`${msg.sender_username} ${isCurrentUserSender ? '(You)' : ''}`}
+                title={
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{`${msg.sender_username} ${isCurrentUserSender ? '(You)' : ''}`}</span>
+                    {currentUserIsAdmin && (
+                      <Tooltip title="Delete Message">
+                        <Button 
+                          icon={<DeleteOutlined />} 
+                          onClick={() => handleDeleteMessage(msg.id)} 
+                          type="text" 
+                          danger 
+                          size="small"
+                          style={{ marginLeft: '8px' }}
+                        />
+                      </Tooltip>
+                    )}
+                  </div>
+                }
                 description={
                     <Card 
                         bodyStyle={{ padding: '10px 15px'}}

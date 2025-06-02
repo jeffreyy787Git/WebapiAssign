@@ -8,7 +8,8 @@ import {
     handleGetMessages,
     handleMarkThreadAsRead,
     handleUpdateThreadStatus,
-    handleGetThreadDetails
+    handleGetThreadDetails,
+    handleDeleteMessageAsAdmin
 } from '../controllers/messaging';
 
 const router = new Router({ prefix: '/api/v1/messaging' });
@@ -26,5 +27,7 @@ router.post('/threads/:threadId/read', basicAuth, handleMarkThreadAsRead);
 router.patch('/threads/:threadId/status', basicAuth, isAdmin, handleUpdateThreadStatus);
 
 router.get('/threads/:threadId', basicAuth, handleGetThreadDetails);
+
+router.delete('/messages/:messageId', basicAuth, isAdmin, handleDeleteMessageAsAdmin);
 
 export { router }; 

@@ -271,4 +271,10 @@ export const getThreadById = async (threadId: number, userId: number, isAdmin: b
   }
 
   return thread;
+};
+
+export const deleteMessageAsAdmin = async (messageId: number): Promise<boolean> => {
+  const query = `DELETE FROM thread_messages WHERE id = $1;`;
+  const result = await db.run_update(query, [messageId]) as { rowCount: number }; 
+  return result && result.rowCount > 0;
 }; 
