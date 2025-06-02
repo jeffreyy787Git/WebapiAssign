@@ -7,11 +7,11 @@ export const getById = async (id: any) => {
   return data;
 }
 
-export const getAll = async() => {
+/*export const getAll = async() => {
   let query = 'SELECT * FROM articles';
   let data = await db.run_query(query, null);
   return data;
-}
+}*/
 
 export const add = async(article: any) => {
   let keys = Object.keys(article);

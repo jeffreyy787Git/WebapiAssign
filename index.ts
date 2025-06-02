@@ -14,6 +14,7 @@ import { router as special } from "./routes/specials";
 import { router as authRoutes } from "./routes/auth";
 import { router as proxy} from "./routes/proxy";
 import { router as hotels } from "./routes/hotels";
+import { router as messaging } from "./routes/messaging";
 
 const app: Koa = new Koa();
 const router: Router = new Router();
@@ -52,6 +53,7 @@ app.use(special.routes()).use(special.allowedMethods());
 app.use(articles.routes()).use(articles.allowedMethods());
 app.use(proxy.routes()).use(proxy.allowedMethods());
 app.use(hotels.routes()).use(hotels.allowedMethods());
+app.use(messaging.routes()).use(messaging.allowedMethods());
 
 app.use(serve(path.join(process.cwd(), 'docs')));
 app.use(mount('/api/v1/uploads', serve(path.join(process.cwd(), 'uploads'))));

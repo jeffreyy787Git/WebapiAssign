@@ -11,6 +11,8 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Profile from './components/Profile';
 import Favourites from './components/Favourites';
+import UserMessages from './components/UserMessages';
+import ThreadDetails from './components/ThreadDetails';
 import { AuthProvider, AuthContext } from './components/AuthContext';
 
 const { Header, Content, Footer } = Layout;
@@ -51,6 +53,7 @@ const Navigation: React.FC = () => {
             <Link to="/favourites">Favourites</Link>
             <Link to="/newarticle">New</Link>
             <Link to="/profile">Profile</Link>
+            <Link to="/messages">Messages</Link>
             <Link to="/" onClick={handleLogout}>Logout</Link>
           </>
         ) : (
@@ -88,6 +91,8 @@ export default function App() {
               />
               <Route path="/profile" element={<Profile />} />
               <Route path="/favourites" element={<Favourites />} />
+              <Route path="/messages" element={<UserMessages />} />
+              <Route path="/messages/:threadId" element={<ThreadDetails />} />
             </Routes>
           </div>
         </Content>

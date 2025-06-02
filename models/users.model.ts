@@ -73,7 +73,7 @@ const mapRowToUser = (row: any): User => {
 };
 
 export const findByUsername = async (username: string): Promise<User[]> => {
-  const query = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE username = ?";
+  const query = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE username = $1";
   const rows = await db.run_query(query, [username]);
   return rows.map(mapRowToUser);
 };
@@ -89,7 +89,7 @@ export interface CreateUserParams {
 export const createUser = async (userData: CreateUserParams): Promise<User[] | any> => {
   const { username, email, passwordhash, passwordsalt, roles } = userData;
   const initialFavouriteHotels = '[]';
-  const query = "INSERT INTO users (username, email, password, passwordsalt, roles, dateregistered, favourite_hotels) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?) RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles, favourite_hotels";
+  const query = "INSERT INTO users (username, email, password, passwordsalt, roles, dateregistered, favourite_hotels) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6) RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles, favourite_hotels";
   const insertResult = await db.run_insert(query, [username, email, passwordhash, passwordsalt, roles, initialFavouriteHotels]);
   
   let returnedData = insertResult.results;
@@ -102,7 +102,7 @@ export const createUser = async (userData: CreateUserParams): Promise<User[] | a
     const meta = insertResult.metadata as any;
     if (typeof meta.lastID === 'number' && meta.lastID > 0 && typeof meta.changes === 'number' && meta.changes > 0) {
         const lastID = meta.lastID;
-        const newUserQuery = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE id = ?";
+        const newUserQuery = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE id = $1";
         const newUsers = await db.run_query(newUserQuery, [lastID]);
         return newUsers.map(mapRowToUser);
     } else if (typeof meta.rowCount === 'number' && meta.rowCount > 0) {
@@ -114,7 +114,7 @@ export const createUser = async (userData: CreateUserParams): Promise<User[] | a
 };
 
 export const updateUserAvatar = async (userId: number, avatarUrl: string): Promise<User[] | any> => {
-  const query = "UPDATE users SET avatarurl = ? WHERE id = ? RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles, favourite_hotels";
+  const query = "UPDATE users SET avatarurl = $1 WHERE id = $2 RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles, favourite_hotels";
   const result = await db.run_query(query, [avatarUrl, userId]);
   if (Array.isArray(result) && result.length > 0) {
     return result.map(mapRowToUser);
@@ -123,7 +123,7 @@ export const updateUserAvatar = async (userId: number, avatarUrl: string): Promi
 };
 
 const findUserByIdInternal = async (userId: number): Promise<User | null> => {
-  const query = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE id = ?";
+  const query = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE id = $1";
   const rows = await db.run_query(query, [userId]);
   if (rows && rows.length > 0) {
     return mapRowToUser(rows[0]);
@@ -147,7 +147,7 @@ export const addHotelToFavourites = async (userId: number, hotelCode: number): P
   if (!currentFavourites.includes(hotelCode)) {
     const updatedFavouritesArray = [...currentFavourites, hotelCode];
     const pgArrayString = `{${updatedFavouritesArray.join(',')}}`;
-    const updateQuery = "UPDATE users SET favourite_hotels = ? WHERE id = ?";
+    const updateQuery = "UPDATE users SET favourite_hotels = $1 WHERE id = $2";
     await db.run_update(updateQuery, [pgArrayString, userId]);
     return findUserByIdInternal(userId);
   }
@@ -170,7 +170,7 @@ export const removeHotelFromFavourites = async (userId: number, hotelCode: numbe
   if (currentFavourites.includes(hotelCode)) {
     const updatedFavouritesArray = currentFavourites.filter(code => code !== hotelCode);
     const pgArrayString = `{${updatedFavouritesArray.join(',')}}`;
-    const updateQuery = "UPDATE users SET favourite_hotels = ? WHERE id = ?";
+    const updateQuery = "UPDATE users SET favourite_hotels = $1 WHERE id = $2";
     await db.run_update(updateQuery, [pgArrayString, userId]);
     return findUserByIdInternal(userId);
   }

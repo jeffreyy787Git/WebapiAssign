@@ -7,7 +7,7 @@ import * as model from "../models/articles.model";
 
 const router = new Router({prefix: '/api/v1/articles'});
 
-const getAll = async (ctx: RouterContext, next: any) => {
+/*const getAll = async (ctx: RouterContext, next: any) => {
   
   let articles = await model.getAll();
   if(articles.length) {
@@ -16,7 +16,7 @@ const getAll = async (ctx: RouterContext, next: any) => {
     ctx.body = {};
   }
   await next();
-}
+}*/
 
 const createArticle = async (ctx: RouterContext, next: any) => {
   
@@ -66,7 +66,7 @@ let article = await model.deleteById(id)
   await next();
 }
 
-router.get('/', getAll);
+//router.get('/', getAll);
 router.post('/',  bodyParser(),  createArticle);
 router.get('/:id([0-9]{1,})', getById);
 router.put('/:id([0-9]{1,})',  bodyParser(), updateArticle);
