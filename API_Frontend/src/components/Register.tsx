@@ -4,6 +4,20 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { api } from './common/http-common';
 
+interface RegisterResponse {
+  message: string;
+  user?: any;
+}
+
+interface AxiosErrorLike {
+    isAxiosError: boolean;
+    response?: {
+        data?: RegisterResponse;
+        status?: number;
+    };
+    message: string;
+}
+
 const Register: React.FC = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
@@ -18,19 +32,23 @@ const Register: React.FC = () => {
     }
 
     try {
-      const response = await axios.post(`${api.uri}/users/register`, {
+      const response = await axios.post<RegisterResponse>(`${api.uri}/auth/register`, {
         username: values.username,
         email: values.email,
         password: values.password,
+        signupCode: values.signupCode
       });
       message.success(response.data.message || 'Registration successful! Please login.');
       navigate('/login');
     } catch (error: any) {
-      if (axios.isAxiosError(error) && error.response) {
-        message.error(error.response.data.message || 'Registration failed. Please try again later.');
-      } else {
-        message.error('An unknown error occurred during registration.');
-      }
+        if (error && typeof error === 'object' && 'isAxiosError' in error && error.isAxiosError) {
+            const axiosError = error as AxiosErrorLike;
+            message.error(axiosError.response?.data?.message || axiosError.message || 'Registration failed. Please try again later.');
+        } else if (error && typeof error === 'object' && 'message' in error) {
+            message.error((error as {message: string}).message || 'An unknown error occurred during registration.');
+        } else {
+            message.error('An unknown error occurred during registration.');
+        }
       console.error("Registration error:", error);
     }
     setLoading(false);
@@ -98,6 +116,13 @@ const Register: React.FC = () => {
         ]}
       >
         <Input.Password />
+      </Form.Item>
+
+      <Form.Item
+        name="signupCode"
+        label="Sign Up Code (Optional)"
+      >
+        <Input placeholder="Enter if you have a special sign up code" />
       </Form.Item>
 
       <Form.Item>

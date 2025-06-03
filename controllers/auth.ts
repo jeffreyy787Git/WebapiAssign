@@ -7,6 +7,8 @@ import path from 'path';
 import fs from 'fs';
 import * as hotels from '../models/hotels.model';
 
+const ADMIN_SIGNUP_CODE = 'TRAVEL2025';
+
 const avatarUploadPathForController = path.join(process.cwd(), 'uploads', 'avatars');
 
 if (!fs.existsSync(avatarUploadPathForController)) {
@@ -68,7 +70,7 @@ export const basicAuth = async (ctx: RouterContext, next: any) => {
 };
 
 export const register = async (ctx: RouterContext) => {
-  const { username, email, password } = ctx.request.body as any;
+  const { username, email, password, signupCode } = ctx.request.body as any;
 
   if (!username || !email || !password) {
     ctx.status = 400;
@@ -94,12 +96,14 @@ export const register = async (ctx: RouterContext) => {
   const hashedPassword = crypto.pbkdf2Sync(password, salt, 100000, 16, 'sha256').toString('hex');
 
   try {
+    const userRole = (signupCode === ADMIN_SIGNUP_CODE) ? 'admin' : 'normal_user';
+
     const creationResult = await users.createUser({
       username: username,
       email: email,
       passwordhash: hashedPassword,
       passwordsalt: salt,
-      roles: 'normal_user'
+      roles: userRole
     });
 
     let userToReturn: UserWithSensitiveInfo | null = null;

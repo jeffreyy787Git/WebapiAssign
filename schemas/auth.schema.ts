@@ -28,6 +28,10 @@ export const registerUserSchema = {
     "lastname": {
       "description": "User's last name (optional)",
       "type": "string"
+    },
+    "signupCode": {
+      "description": "Optional code to be travel operator",
+      "type": "string"
     }
   },
   "required": ["username", "email", "password"]

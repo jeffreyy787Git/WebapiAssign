@@ -88,7 +88,7 @@ export interface CreateUserParams {
 
 export const createUser = async (userData: CreateUserParams): Promise<User[] | any> => {
   const { username, email, passwordhash, passwordsalt, roles } = userData;
-  const initialFavouriteHotels = '[]';
+  const initialFavouriteHotels = '{}';
   const query = "INSERT INTO users (username, email, password, passwordsalt, roles, dateregistered, favourite_hotels) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6) RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles, favourite_hotels";
   const insertResult = await db.run_insert(query, [username, email, passwordhash, passwordsalt, roles, initialFavouriteHotels]);
   
