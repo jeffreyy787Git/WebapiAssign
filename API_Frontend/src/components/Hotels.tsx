@@ -71,6 +71,7 @@ const HotelPage = () => {
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [currentHotel, setCurrentHotel] = useState<DisplayableHotel | null>(null);
   const [form] = Form.useForm();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const authContext = useContext(AuthContext);
   if (!authContext) {
@@ -199,6 +200,10 @@ const HotelPage = () => {
     });
   };
 
+  const filteredHotels = dbHotels?.filter(hotel =>
+    hotel.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (isVerifying) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} tip="Verifying authentication..." /></div>;
 
   if (loading && !isVerifying) return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}><Spin indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} tip="Loading hotels..." /></div>;
@@ -219,6 +224,12 @@ const HotelPage = () => {
     <>
       <div style={{ textAlign: 'center', marginBottom: 24, padding: '10px' }}>
         <Title level={3}>Hotel Listings</Title>
+        <Input.Search
+          placeholder="Search by hotel name"
+          onChange={e => setSearchTerm(e.target.value)}
+          style={{ width: 300, marginBottom: 16, display: 'block', marginLeft: 'auto', marginRight: 'auto' }}
+          allowClear
+        />
         {user && user.roles && user.roles.includes('admin') && (
           <>
             <Button type="primary" icon={<SyncOutlined />} loading={isRefreshing} onClick={handleRefreshData} style={{marginTop: 8, marginRight: 8}}>
@@ -232,14 +243,14 @@ const HotelPage = () => {
          {error && dbHotels && <Alert message="Last Operation Error" description={error} type="warning" showIcon style={{ marginTop: 16, textAlign: 'left' }} />}
       </div>
 
-      {!dbHotels || dbHotels.length === 0 ? (
+      {!filteredHotels || filteredHotels.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 20 }}>
-        { !isAuthenticated && !isVerifying && error ? null : <Title level={4}>No Hotels Available</Title> }
-          <p>There are currently no hotels to display. {user && user.roles && user.roles.includes('admin') ? 'Try refreshing the data.' : isAuthenticated ? '' : 'Please check back later.'}</p>
+        { !isAuthenticated && !isVerifying && error && !searchTerm ? null : <Title level={4}>{searchTerm ? 'No Hotels Match Your Search' : 'No Hotels Available'}</Title> }
+          <p>There are currently no hotels to display. {user && user.roles && user.roles.includes('admin') ? 'Try refreshing the data or adjusting your search.' : isAuthenticated ? (searchTerm ? 'Try a different search term.' : '') : 'Please check back later.'}</p>
         </div>
       ) : (
         <Row gutter={[16, 16]} style={{padding: '0 24px'}}>
-          {dbHotels.map((hotel) => {
+          {filteredHotels.map((hotel) => {
             const currentlyFavourite = isFavourite(hotel.code, user);
             return (
               <Col xs={24} sm={12} md={8} lg={6} key={hotel.code}>

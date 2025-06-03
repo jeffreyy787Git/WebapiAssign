@@ -10,76 +10,224 @@ info:
     name: Apache 2.0
     url: 'https://www.apache.org/licenses/LICENSE-2.0.html'
 servers:   
-  - url: 'https://33685546-3a45-4c69-9908-28de36548ddf-00-2t7ws6vqhwtme.kirk.repl.co/api/v1/'     
-    description: Development server
+  - url: 'http://localhost:1088/api/v1/'     
+    description: Local server
 tags:
   - name: Users
     description: API endpoints for user management
-  - name: Articles
-    description: Access and perform CRUD operations for blog
+  - name: Hotels
+    description: API endpoints for hotel data management and proxy searches
+  - name: Messaging
+    description: API endpoints for user messaging
+
 paths:
-  /articles/{id}:
-    parameters:
-      - in: path
-        name: id
-        schema: 
-          type: integer
-        required: true
-        description: Numeric id of the article
+  /db/hotels:
     get:
       tags:
-        - Articles
-      description:
-        get article by id
+        - Hotels
+      description: 
+        Retrieves a list of all hotels stored in the database.
       responses:
         '200':
-          description: View of an article record
-        '404':
-          description: Article not found
-    put:
-      tags:
-        - Articles
-      description:
-        update the article by id
-      responses:
-        '201':
-          description: Update Successfully
-        '404':
-          description: Article not found
-    delete:
-      tags:
-        - Articles
-      description:
-        Delete article by ID.
-      responses:
-        '200':
-          description: View of an article record.
-        '404':
-          description: Article was not found in the DB.
-  /articles:
-    get:
-     tags:
-     - Articles
-     description: Get all articles
-     responses:
-      '200':
-       description: OK
-      '404':
-       description: Not Found  
+          description: OK
+        '500':
+          description: Failed
     post:
       tags:
-        - Articles
-      description:
-        Create an article
+        - Hotels
+      description: 
+        Adds a new hotel to the database. Requires admin privileges.
+      security:
+        - BasicAuth: []
+      responses:
+        '201':
+          description: Success
+        '400':
+          description: Bad request.
+        '403':
+          description: User is not an admin
+        '409':
+          description: Hotel with code already exists
+        '500':
+          description: Failed
+
+  /db/hotels/refresh:
+    post:
+      tags:
+        - Hotels
+      description: 
+        Clears existing hotel data and fetches fresh data from Hotelbeds API. Requires admin privileges.
+      security:
+        - BasicAuth: []
+      responses:
+        '200':
+          description: Success
+        '403':
+          description: User is not an admin
+        '500':
+          description: Failed
+
+  /db/hotels/{hotelCode}:
+    put:
+      tags:
+        - Hotels
+      description: 
+        Updates an existing hotel in the database. Requires admin privileges.
+      security:
+        - BasicAuth: []
       requestBody:
-        description: Article in JSON format
+        description: Hotel data to update. At least one field must be provided.
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request
+        '403':
+          description: User is not an admin
+        '404':
+          description: Hotel not found
+        '500':
+          description: Failed
+    delete:
+      tags:
+        - Hotels
+      description: 
+        Deletes a hotel from the database by its code. Requires admin privileges.
+      security:
+        - BasicAuth: []
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request
+        '403':
+          description: User is not an admin
+        '404':
+          description: Hotel not found
+        '500':
+          description: Failed
+
+  /db/hotels/proxy-hotel-search:
+    post:
+      tags:
+        - Hotels
+      description: 
+        Forwards search criteria to the Hotelbeds API to find available hotels.
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request
+        '500':
+          description: Failed
+
+  /db/hotels/proxy-hotel-content:
+    get:
+      tags:
+        - Hotels
+      description: 
+        Fetches hotel details (images, descriptions) from Hotelbeds Content API by hotel codes.
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request
+        '500':
+          description: Failed
+
+  /auth/register:
+    post:
+      tags:
+        - Users
+      description: 
+        Creates a new user account.
+      responses:
+        '201':
+          description: Success
+        '400':
+          description: Bad request
+        '409':
+          description: Conflict
+
+  /auth/login:
+    post:
+      tags:
+        - Users
+      description: 
+        Authenticates a user and returns a session token (or sets a cookie).
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+
+  /auth/me:
+    get:
+      tags:
+        - Users
+      description: 
+        Retrieves the profile information of the currently authenticated user.
+      security:
+        - BasicAuth: []
+      responses:
+        '200':
+          description: Success
+        '401':
+          description: Unauthorized
+    put:
+      tags:
+        - Users
+      description: 
+        Updates the profile information of the currently authenticated user.
+      security:
+        - BasicAuth: []
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+
+  /messaging:
+    get:
+      tags:
+        - Messaging
+      description: 
+        Retrieves messages, potentially for a specific conversation or user. Requires authentication.
+      security:
+        - BasicAuth: []
+      responses:
+        '200':
+          description: Success
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized.
+    post:
+      tags:
+        - Messaging
+      description: 
+        Sends a new message from the authenticated user to a recipient. Requires authentication.
+      security:
+        - BasicAuth: []
+      requestBody:
+        description: Message object to send.
         required: true
         content:
           application/json:
-            schema: 
-              $ref: ./article.json#/definitions/article
+            schema:
+              $ref: './messaging.json#/definitions/sendMessage'
       responses:
         '201':
-          description: an article added
+          description: Message sent successfully.
+          content:
+            application/json:
+              schema:
+                $ref: './messaging.json#/definitions/sendMessage'
         '400':
           description: Bad request
+        '401':
+          description: Unauthorized.

@@ -111,9 +111,6 @@ export const saveHotelsBatch = async (hotels: DbHotel[]): Promise<DbHotel[]> => 
     }
 };
 
-/**
- * Retrieves all hotels from the database.
- */
 export const getAllHotels = async (): Promise<DbHotel[]> => {
     const client = await pool.connect();
     try {
@@ -127,9 +124,6 @@ export const getAllHotels = async (): Promise<DbHotel[]> => {
     }
 };
 
-
-// --- Functions to interact with 'hotel_images' table ---
-
 export const saveHotelImagesBatch = async (images: DbHotelImage[]): Promise<void> => {
     if (!images || images.length === 0) {
         return;
@@ -137,11 +131,10 @@ export const saveHotelImagesBatch = async (images: DbHotelImage[]): Promise<void
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        // Optional: Clear existing images for these hotels before inserting new ones
-        // const hotelCodes = [...new Set(images.map(img => img.hotel_code))];
-        // if (hotelCodes.length > 0) {
-        //    await client.query('DELETE FROM hotel_images WHERE hotel_code = ANY($1::int[])', [hotelCodes]);
-        // }
+        const hotelCodes = [...new Set(images.map(img => img.hotel_code))];
+        if (hotelCodes.length > 0) {
+        await client.query('DELETE FROM hotel_images WHERE hotel_code = ANY($1::int[])', [hotelCodes]);
+        }
 
         for (const image of images) {
             const query = `
@@ -294,9 +287,6 @@ export const getRoomsAndRatesForHotel = async (hotelCode: number): Promise<DbRoo
     }
 };
 
-// You might also want a function to get a single hotel with all its details (images, rooms, rates)
-// This would involve joining the tables or making multiple queries.
-// Example:
 export interface FullHotelData extends DbHotel {
     images: DbHotelImage[];
     rooms: DbRoomWithRates[];
@@ -308,11 +298,9 @@ export const getFullHotelDataByCode = async (hotelCode: number): Promise<FullHot
     try {
         const hotelResult = await client.query('SELECT * FROM hotels WHERE code = $1', [hotelCode]);
         if (hotelResult.rows.length === 0) {
-            client.release(); // Release client if hotel not found
             return null;
         }
         hotel = hotelResult.rows[0] as DbHotel;
-        // These functions handle their own client connections and releases
         const images = await getImagesForHotel(hotelCode);
         const roomsWithRates = await getRoomsAndRatesForHotel(hotelCode);
 
@@ -325,9 +313,6 @@ export const getFullHotelDataByCode = async (hotelCode: number): Promise<FullHot
         console.error(`Error in getFullHotelDataByCode for hotel ${hotelCode}:`, error);
         throw error;
     } finally {
-        // Ensure client is released only if it hasn't been released already (e.g. in case of !hotel)
-        // However, getImagesForHotel and getRoomsAndRatesForHotel manage their own clients.
-        // The client from this function's scope needs to be released.
         if (client) client.release();
     }
 };
@@ -346,7 +331,6 @@ export const getAllFullHotelsData = async (): Promise<FullHotelData[]> => {
         const fullHotelsData: FullHotelData[] = [];
 
         for (const hotel of dbHotels) {
-            // These functions manage their own client connections
             const images = await getImagesForHotel(hotel.code);
             const roomsWithRates = await getRoomsAndRatesForHotel(hotel.code);
             fullHotelsData.push({

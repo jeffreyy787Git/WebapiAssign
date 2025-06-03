@@ -1,0 +1,96 @@
+export const registerUserSchema = {
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "/registerUser",
+  "title": "Register User",
+  "description": "Schema for user registration",
+  "type": "object",
+  "properties": {
+    "username": {
+      "description": "Username for the new account",
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 30
+    },
+    "email": {
+      "description": "Email address for the new account",
+      "type": "string",
+      "format": "email"
+    },
+    "password": {
+      "description": "Password for the new account",
+      "type": "string",
+      "minLength": 8
+    },
+    "firstname": {
+      "description": "User's first name (optional)",
+      "type": "string"
+    },
+    "lastname": {
+      "description": "User's last name (optional)",
+      "type": "string"
+    }
+  },
+  "required": ["username", "email", "password"]
+};
+
+export const loginUserSchema = {
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "/loginUser",
+  "title": "Login User",
+  "description": "Schema for user login",
+  "type": "object",
+  "properties": {
+    "usernameOrEmail": {
+      "description": "Username or email for login",
+      "type": "string"
+    },
+    "password": {
+      "description": "Password for login",
+      "type": "string"
+    }
+  },
+  "required": ["usernameOrEmail", "password"]
+};
+
+export const updateUserSchema = {
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "/updateUser",
+  "title": "Update User Profile",
+  "description": "Schema for updating user profile information (e.g., /auth/me)",
+  "type": "object",
+  "properties": {
+    "email": {
+      "description": "New email address for the account",
+      "type": "string",
+      "format": "email"
+    },
+    "firstname": {
+      "description": "User's first name",
+      "type": "string"
+    },
+    "lastname": {
+      "description": "User's last name",
+      "type": "string"
+    },
+    "about": {
+        "description": "A short bio or about me section for the user",
+        "type": "string"
+    },
+    "currentPassword": {
+        "description": "Current password (required if changing password)",
+        "type": "string"
+    },
+    "newPassword": {
+        "description": "New password (if changing)",
+        "type": "string",
+        "minLength": 8
+    }
+  },
+  "minProperties": 1,
+  "if": {
+    "properties": { "newPassword": { "type": "string" } }
+  },
+  "then": {
+    "required": ["currentPassword"]
+  }
+}; 

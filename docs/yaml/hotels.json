@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "definitions": {
+    "createHotel": {
+      "id": "/createHotel",
+      "title": "Create Hotel",
+      "description": "Schema for creating a new hotel entry",
+      "type": "object",
+      "properties": {
+        "code": {
+          "description": "Unique code for the hotel",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Name of the hotel",
+          "type": "string"
+        },
+        "category_name": {
+          "description": "Category name of the hotel",
+          "type": "string"
+        },
+        "destination_name": {
+          "description": "Destination name where the hotel is located",
+          "type": "string"
+        },
+        "zone_name": {
+          "description": "Zone name within the destination",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Currency used for rates",
+          "type": "string",
+          "maxLength": 3,
+          "minLength": 3
+        },
+        "min_rate": {
+          "description": "Minimum rate for the hotel",
+          "type": ["number", "null"]
+        },
+        "max_rate": {
+          "description": "Maximum rate for the hotel",
+          "type": ["number", "null"]
+        },
+        "available_rooms": {
+          "description": "Number of available rooms",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["code", "name", "available_rooms"]
+    },
+    "updateHotel": {
+      "id": "/updateHotel",
+      "title": "Update Hotel",
+      "description": "Schema for updating an existing hotel entry",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name of the hotel",
+          "type": "string"
+        },
+        "category_name": {
+          "description": "Category name of the hotel",
+          "type": "string"
+        },
+        "destination_name": {
+          "description": "Destination name where the hotel is located",
+          "type": "string"
+        },
+        "zone_name": {
+          "description": "Zone name within the destination",
+          "type": "string"
+        },
+        "currency": {
+          "description": "Currency used for rates",
+          "type": "string",
+          "maxLength": 3,
+          "minLength": 3
+        },
+        "min_rate": {
+          "description": "Minimum rate for the hotel",
+          "type": ["number", "null"]
+        },
+        "max_rate": {
+          "description": "Maximum rate for the hotel",
+          "type": ["number", "null"]
+        },
+        "available_rooms": {
+          "description": "Number of available rooms",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "minProperties": 1
+    }
+  }
+} 

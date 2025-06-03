@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "definitions": {
+    "sendMessage": {
+      "id": "/sendMessage",
+      "title": "Send Message",
+      "description": "Schema for sending a new message",
+      "type": "object",
+      "properties": {
+        "recipient_id": {
+          "description": "User ID of the message recipient",
+          "type": "integer",
+          "minimum": 1
+        },
+        "sender_id": {
+          "description": "User ID of the message sender (optional, could be inferred from auth)",
+          "type": "integer",
+          "minimum": 1
+        },
+        "message_content": {
+          "description": "The content of the message",
+          "type": "string",
+          "minLength": 1
+        },
+        "conversation_id": {
+          "description": "Optional ID for an existing conversation",
+          "type": ["integer", "null"],
+          "minimum": 1
+        }
+      },
+      "required": ["recipient_id", "message_content"]
+    },
+    "getMessages": {
+      "id": "/getMessages",
+      "title": "Get Messages",
+      "description": "Schema for query parameters when fetching messages (e.g., for a conversation)",
+      "type": "object",
+      "properties": {
+        "conversation_id": {
+          "description": "ID of the conversation to fetch messages for",
+          "type": "integer",
+          "minimum": 1
+        },
+        "user_id": {
+          "description": "ID of a user, to fetch all conversations/messages related to this user",
+          "type": "integer",
+          "minimum": 1
+        },
+        "limit": {
+          "description": "Maximum number of messages to return",
+          "type": "integer",
+          "minimum": 1,
+          "default": 20
+        },
+        "offset": {
+          "description": "Number of messages to skip (for pagination)",
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      },
+      "anyOf": [
+        { "required": ["conversation_id"] },
+        { "required": ["user_id"] }
+      ]
+    }
+  }
+} 
