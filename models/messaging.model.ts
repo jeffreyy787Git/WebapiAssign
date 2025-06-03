@@ -1,5 +1,4 @@
 import * as db from '../helpers/database';
-import { User } from './users.model';
 
 export interface MessageThread {
   id: number;
@@ -53,37 +52,47 @@ export const createThread = async (params: CreateThreadParams): Promise<MessageT
     RETURNING id, user_id, subject, created_at, last_message_at, status, is_read_by_user, is_read_by_admin, last_message_preview;
   `;
   
-  const threadInsertResult = await db.run_insert(threadQuery, [
+  const threadInsertResult: any = await db.run_insert(threadQuery, [
     userId,
     subject || null,
     'open',
     truncatePreview(initialMessageContent)
-  ]) as any;
+  ]);
 
   let newThread: MessageThread | undefined;
   if (threadInsertResult && Array.isArray(threadInsertResult.results) && threadInsertResult.results.length > 0) {
     newThread = threadInsertResult.results[0] as MessageThread;
   } else if (threadInsertResult && typeof threadInsertResult.results === 'object' && threadInsertResult.results !== null && !Array.isArray(threadInsertResult.results)) {
     newThread = threadInsertResult.results as MessageThread;
-  } else if (threadInsertResult && typeof threadInsertResult.lastID === 'number' && threadInsertResult.lastID > 0 && threadInsertResult.changes > 0) {
-    console.warn('createThread: RETURNING results not in expected array/object format, attempting refetch via lastID');
+  } else if (Array.isArray(threadInsertResult) && threadInsertResult.length > 0) {
+    newThread = threadInsertResult[0] as MessageThread;
+  } else if (threadInsertResult && typeof threadInsertResult.lastID === 'number' && threadInsertResult.lastID > 0 && 
+             (typeof threadInsertResult.changes === 'number' && threadInsertResult.changes > 0 || typeof threadInsertResult.rowCount === 'number' && threadInsertResult.rowCount > 0) ) {
+    console.warn('createThread: RETURNING data not in expected primary structures, attempting refetch via lastID based on metadata.');
     return getThreadById(threadInsertResult.lastID, userId, false);
   }
   
-  if (!newThread || !newThread.id) {
-    console.error("Thread creation failed or did not return expected data from RETURNING clause nor via lastID.", threadInsertResult);
-    throw new Error("Thread creation failed to return necessary data.");
+  if (!newThread || typeof newThread.id !== 'number') {
+    console.error("Thread creation failed or did not return expected data (id missing or invalid). Result:", threadInsertResult);
+    return null; 
   }
 
   const messageQuery = `
     INSERT INTO thread_messages (thread_id, sender_id, sender_username, content, created_at)
     VALUES ($1, $2, $3, $4, NOW())
-    RETURNING id;
+    RETURNING id; // Only need ID to confirm, or could return more if needed elsewhere
   `;
-  await db.run_insert(messageQuery, [newThread.id, userId, userUsername, initialMessageContent]);
+  const initialMessageInsertResult: any = await db.run_insert(messageQuery, [newThread.id, userId, userUsername, initialMessageContent]);
+  if (!initialMessageInsertResult || 
+      !( (Array.isArray(initialMessageInsertResult.results) && initialMessageInsertResult.results.length > 0) || 
+         (Array.isArray(initialMessageInsertResult) && initialMessageInsertResult.length > 0) || 
+         (initialMessageInsertResult.lastID > 0 && (initialMessageInsertResult.changes > 0 || initialMessageInsertResult.rowCount > 0)) ||
+         (typeof initialMessageInsertResult.rowCount === 'number' && initialMessageInsertResult.rowCount > 0) )) {
+      console.warn("Initial message for new thread may not have been saved, or insert result was not confirmative. Thread ID:", newThread.id);
+  }
 
   if (!newThread.user_username) {
-    return getThreadById(newThread.id, userId, false);
+    newThread.user_username = userUsername;
   }
   return newThread;
 };
@@ -94,25 +103,27 @@ export const addMessageToThread = async (params: AddMessageParams): Promise<Thre
   const messageQuery = `
     INSERT INTO thread_messages (thread_id, sender_id, sender_username, content, created_at)
     VALUES ($1, $2, $3, $4, NOW())
-    RETURNING *;
+    RETURNING *; // Return all fields of the new message
   `;
-  const messageInsertResult = await db.run_insert(messageQuery, [threadId, senderId, senderUsername, content]) as any;
+  const messageInsertResult: any = await db.run_insert(messageQuery, [threadId, senderId, senderUsername, content]);
 
   let newMessage: ThreadMessage | undefined;
   if (messageInsertResult && Array.isArray(messageInsertResult.results) && messageInsertResult.results.length > 0) {
     newMessage = messageInsertResult.results[0] as ThreadMessage;
-  } else if (messageInsertResult && typeof messageInsertResult.results === 'object' && messageInsertResult.results !== null && !Array.isArray(messageInsertResult.results)) {
-    newMessage = messageInsertResult.results as ThreadMessage;
+  } else if (Array.isArray(messageInsertResult) && messageInsertResult.length > 0) {
+    newMessage = messageInsertResult[0] as ThreadMessage;
+  } else if (messageInsertResult && typeof messageInsertResult === 'object' && !Array.isArray(messageInsertResult) && messageInsertResult.id) {
+    newMessage = messageInsertResult as ThreadMessage;
   }
 
   if (!newMessage) {
-    console.error("Message insertion failed or did not return expected data from RETURNING.", messageInsertResult);
-    throw new Error("Message insertion failed to return data.");
+    console.error("Message insertion failed or did not return expected data from RETURNING. Result:", messageInsertResult);
+    return null;
   }
 
   const newStatus = senderIsAdmin ? 'pending_user' : 'pending_admin';
-  const readByUser = senderIsAdmin;
-  const readByAdmin = !senderIsAdmin;
+  const readByUserUpdate = senderIsAdmin;
+  const readByAdminUpdate = !senderIsAdmin;
 
   const updateThreadQuery = `
     UPDATE message_threads
@@ -120,15 +131,32 @@ export const addMessageToThread = async (params: AddMessageParams): Promise<Thre
       last_message_at = NOW(),
       last_message_preview = $1,
       status = $2,
-      is_read_by_user = $3,
-      is_read_by_admin = $4
+      is_read_by_user = CASE WHEN $3 = TRUE THEN TRUE ELSE is_read_by_user END,   -- If sender is admin, set user_read to TRUE (user just sent this)
+      is_read_by_admin = CASE WHEN $4 = TRUE THEN TRUE ELSE is_read_by_admin END -- If sender is user, set admin_read to TRUE (admin just sent this)
+      -- More accurately: if user sends, admin needs to read it (is_read_by_admin = FALSE)
+      -- if admin sends, user needs to read it (is_read_by_user = FALSE)
     WHERE id = $5;
   `;
-  await db.run_update(updateThreadQuery, [
+  
+  const finalUpdateThreadQuery = `
+    UPDATE message_threads
+    SET 
+      last_message_at = NOW(),
+      last_message_preview = $1, -- content preview
+      status = $2, -- new status (e.g. pending_user or pending_admin)
+      is_read_by_user = $3, -- target value for is_read_by_user
+      is_read_by_admin = $4 -- target value for is_read_by_admin
+    WHERE id = $5; -- threadId
+  `;
+
+  const newReadByUser = !senderIsAdmin; 
+  const newReadByAdmin = senderIsAdmin;
+
+  await db.run_update(finalUpdateThreadQuery, [
     truncatePreview(content),
     newStatus,
-    readByUser,
-    readByAdmin,
+    newReadByUser, 
+    newReadByAdmin,
     threadId
   ]);
 
@@ -147,8 +175,8 @@ export const getThreadsForUser = async (userId: number, limit: number, offset: n
     ORDER BY t.last_message_at DESC
     LIMIT $2 OFFSET $3;
   `;
-  const result = await db.run_query(query, [userId, limit, offset]) as MessageThread[];
-  return result || [];
+  const result: any = await db.run_query(query, [userId, limit, offset]);
+  return (Array.isArray(result) ? result : (result && Array.isArray(result.rows) ? result.rows : [])) as MessageThread[];
 };
 
 export const getThreadsForAdmin = async (limit: number, offset: number): Promise<MessageThread[]> => {
@@ -159,11 +187,11 @@ export const getThreadsForAdmin = async (limit: number, offset: number): Promise
       t.last_message_preview, t.is_read_by_user, t.is_read_by_admin
     FROM message_threads t
     JOIN users u ON t.user_id = u.id
-    ORDER BY t.is_read_by_admin ASC, t.last_message_at DESC
+    ORDER BY t.is_read_by_admin ASC, t.status ASC, t.last_message_at DESC -- Prioritize unread by admin, then by status, then by time
     LIMIT $1 OFFSET $2;
   `;
-  const result = await db.run_query(query, [limit, offset]) as MessageThread[];
-  return result || [];
+  const result: any = await db.run_query(query, [limit, offset]);
+  return (Array.isArray(result) ? result : (result && Array.isArray(result.rows) ? result.rows : [])) as MessageThread[];
 };
 
 interface ThreadOwnerRow {
@@ -172,16 +200,18 @@ interface ThreadOwnerRow {
 
 export const getMessagesForThread = async (threadId: number, userId: number, isAdmin: boolean): Promise<ThreadMessage[]> => {
   const checkOwnershipQuery = `SELECT user_id FROM message_threads WHERE id = $1;`;
-  const ownerResult = await db.run_query(checkOwnershipQuery, [threadId]) as ThreadOwnerRow[];
+  const ownerResult: any = await db.run_query(checkOwnershipQuery, [threadId]);
+  const ownerRows = Array.isArray(ownerResult) ? ownerResult : (ownerResult && Array.isArray(ownerResult.rows) ? ownerResult.rows : []);
 
-  if (!ownerResult || ownerResult.length === 0) {
+  if (!ownerRows || ownerRows.length === 0) {
     console.warn(`getMessagesForThread: Thread ${threadId} not found.`);
     return [];
   }
 
-  if (!isAdmin && ownerResult[0]?.user_id !== userId) {
-    console.warn(`getMessagesForThread: User ${userId} does not own thread ${threadId}.`);
-    throw new Error('Forbidden: You do not have access to this thread.');
+  const threadOwner: ThreadOwnerRow = ownerRows[0];
+  if (!isAdmin && threadOwner.user_id !== userId) {
+    console.warn(`getMessagesForThread: User ${userId} does not own thread ${threadId}. Access denied.`);
+    throw new Error('Forbidden: You do not have access to this thread.'); 
   }
 
   const query = `
@@ -193,8 +223,8 @@ export const getMessagesForThread = async (threadId: number, userId: number, isA
     WHERE tm.thread_id = $1
     ORDER BY tm.created_at ASC;
   `;
-  const result = await db.run_query(query, [threadId]) as ThreadMessage[];
-  return result || [];
+  const messagesResult: any = await db.run_query(query, [threadId]);
+  return (Array.isArray(messagesResult) ? messagesResult : (messagesResult && Array.isArray(messagesResult.rows) ? messagesResult.rows : [])) as ThreadMessage[];
 };
 
 interface ThreadReadStatusRow {
@@ -203,24 +233,27 @@ interface ThreadReadStatusRow {
   is_read_by_admin: boolean;
 }
 
-interface UpdateResult {
-  rowCount: number;
+interface UpdateResultMetadata {
+  changes?: number;
+  rowCount?: number;
+  lastID?: any;
 }
 
 export const markThreadAsRead = async (threadId: number, role: 'user' | 'admin', userIdForAuth: number): Promise<boolean> => {
   const threadCheckQuery = `SELECT user_id, is_read_by_user, is_read_by_admin FROM message_threads WHERE id = $1;`;
-  const threadCheckResult = await db.run_query(threadCheckQuery, [threadId]) as ThreadReadStatusRow[];
+  const threadCheckResult: any = await db.run_query(threadCheckQuery, [threadId]);
+  const threadCheckRows = Array.isArray(threadCheckResult) ? threadCheckResult : (threadCheckResult && Array.isArray(threadCheckResult.rows) ? threadCheckResult.rows : []);
 
-  if (threadCheckResult.length === 0) {
+  if (threadCheckRows.length === 0) {
     console.warn(`markThreadAsRead: Thread ${threadId} not found.`);
     return false;
   }
 
-  const thread = threadCheckResult[0];
+  const thread: ThreadReadStatusRow = threadCheckRows[0];
 
   if (role === 'user' && thread.user_id !== userIdForAuth) {
-    console.warn(`markThreadAsRead: User ${userIdForAuth} unauthorized to mark thread ${threadId} as read by user.`);
-    return false; 
+    console.warn(`markThreadAsRead: User ${userIdForAuth} unauthorized to mark thread ${threadId} as read by user. This action is forbidden.`);
+    return false;
   }
 
   let query = '';
@@ -237,14 +270,22 @@ export const markThreadAsRead = async (threadId: number, role: 'user' | 'admin',
     return true;
   }
 
-  const updateResult = await db.run_update(query, [threadId]) as UpdateResult;
-  return updateResult.rowCount > 0;
+  const updateResult: any = await db.run_update(query, [threadId]);
+  const success = (updateResult && (typeof updateResult.rowCount === 'number' && updateResult.rowCount > 0)) ||
+                  (updateResult && (typeof updateResult.changes === 'number' && updateResult.changes > 0)) ||
+                  (Array.isArray(updateResult) && updateResult.length > 0) || 
+                  (updateResult && Array.isArray(updateResult.results) && updateResult.results.length > 0);
+  return !!success;
 };
 
 export const updateThreadStatus = async (threadId: number, status: string): Promise<boolean> => {
   const query = `UPDATE message_threads SET status = $1 WHERE id = $2;`;
-  const result = await db.run_update(query, [status, threadId]) as UpdateResult;
-  return result.rowCount > 0;
+  const result: any = await db.run_update(query, [status, threadId]);
+  const success = (result && (typeof result.rowCount === 'number' && result.rowCount > 0)) ||
+                  (result && (typeof result.changes === 'number' && result.changes > 0)) ||
+                  (Array.isArray(result) && result.length > 0) || 
+                  (result && Array.isArray(result.results) && result.results.length > 0);
+  return !!success;
 };
 
 export const getThreadById = async (threadId: number, userId: number, isAdmin: boolean): Promise<MessageThread | null> => {
@@ -257,16 +298,18 @@ export const getThreadById = async (threadId: number, userId: number, isAdmin: b
     JOIN users u ON t.user_id = u.id
     WHERE t.id = $1;
   `;
-  const resultRows = await db.run_query(query, [threadId]) as MessageThread[];
+  const resultRows: any = await db.run_query(query, [threadId]);
+  const rows = Array.isArray(resultRows) ? resultRows : (resultRows && Array.isArray(resultRows.rows) ? resultRows.rows : []);
 
-  if (!resultRows || resultRows.length === 0) {
+
+  if (!rows || rows.length === 0) {
     return null;
   }
 
-  const thread = resultRows[0];
+  const thread: MessageThread = rows[0] as MessageThread;
 
   if (!isAdmin && thread.user_id !== userId) {
-    console.warn(`getThreadById: User ${userId} is not authorized to access thread ${threadId}.`);
+    console.warn(`getThreadById: User ${userId} is not authorized to access thread ${threadId}. Access denied.`);
     return null;
   }
 
@@ -275,6 +318,8 @@ export const getThreadById = async (threadId: number, userId: number, isAdmin: b
 
 export const deleteMessageAsAdmin = async (messageId: number): Promise<boolean> => {
   const query = `DELETE FROM thread_messages WHERE id = $1;`;
-  const result = await db.run_update(query, [messageId]) as { rowCount: number }; 
-  return result && result.rowCount > 0;
+  const result: any = await db.run_update(query, [messageId]); 
+  const success = (result && (typeof result.rowCount === 'number' && result.rowCount > 0)) ||
+                  (result && (typeof result.changes === 'number' && result.changes > 0));
+  return !!success;
 }; 

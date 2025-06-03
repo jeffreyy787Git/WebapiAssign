@@ -19,13 +19,13 @@ const parseFavouriteHotels = (dbValue: any): number[] => {
   if (Array.isArray(dbValue)) {
     const numbers = dbValue.filter(item => typeof item === 'number');
     if (numbers.length !== dbValue.length) {
-      console.warn("parseFavouriteHotels: Some items in the array were not numbers:", dbValue);
+      console.warn("parseFavouriteHotels: Some items in the array were not numbers and were filtered out:", dbValue);
     }
     return numbers;
   }
 
   if (typeof dbValue === 'number') {
-    console.warn("parseFavouriteHotels: Received a single number, wrapping in an array:", dbValue);
+    console.warn("parseFavouriteHotels: Received a single number, wrapping in an array. Check data integrity if an array was expected:", dbValue);
     return [dbValue];
   }
   
@@ -40,7 +40,7 @@ const parseFavouriteHotels = (dbValue: any): number[] => {
                 return parsedArray;
             }
         } catch (e) {
-            console.error("parseFavouriteHotels: Error parsing string array literal:", dbValue, e);
+            console.error("parseFavouriteHotels: Error parsing string array literal format:", dbValue, e);
         }
     }
     try {
@@ -51,7 +51,7 @@ const parseFavouriteHotels = (dbValue: any): number[] => {
         }
     } catch (e) {
     }
-    console.warn("parseFavouriteHotels: Received a string that was not a recognized array format or JSON array of numbers:", dbValue);
+    console.warn("parseFavouriteHotels: Received a string that was not a recognized PG array literal or JSON array of numbers:", dbValue);
     return [];
   }
 
@@ -59,12 +59,12 @@ const parseFavouriteHotels = (dbValue: any): number[] => {
     return [];
   }
   
-  console.warn("parseFavouriteHotels: Unrecognized format for favourite_hotels, returning empty array. Value:", dbValue);
+  console.warn("parseFavouriteHotels: Unrecognized format for favourite_hotels, returning empty array. Value:", dbValue, "Type:", typeof dbValue);
   return [];
 };
 
 const mapRowToUser = (row: any): User => {
-  if (!row) return row;
+  if (!row || typeof row !== 'object') return row as User;
   const { favourite_hotels, ...restOfRow } = row;
   return {
     ...restOfRow,
@@ -74,7 +74,8 @@ const mapRowToUser = (row: any): User => {
 
 export const findByUsername = async (username: string): Promise<User[]> => {
   const query = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE username = $1";
-  const rows = await db.run_query(query, [username]);
+  const result: any = await db.run_query(query, [username]);
+  const rows = Array.isArray(result) ? result : (result && Array.isArray(result.rows) ? result.rows : []);
   return rows.map(mapRowToUser);
 };
 
@@ -86,46 +87,52 @@ export interface CreateUserParams {
   roles: string;
 }
 
-export const createUser = async (userData: CreateUserParams): Promise<User[] | any> => {
+export const createUser = async (userData: CreateUserParams): Promise<User[]> => {
   const { username, email, passwordhash, passwordsalt, roles } = userData;
   const initialFavouriteHotels = '{}';
   const query = "INSERT INTO users (username, email, password, passwordsalt, roles, dateregistered, favourite_hotels) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, $6) RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles, favourite_hotels";
-  const insertResult = await db.run_insert(query, [username, email, passwordhash, passwordsalt, roles, initialFavouriteHotels]);
+  const insertResult: any = await db.run_insert(query, [username, email, passwordhash, passwordsalt, roles, initialFavouriteHotels]);
   
-  let returnedData = insertResult.results;
+  let returnedData: any[] = [];
 
-  if (Array.isArray(returnedData) && returnedData.length > 0) {
-    return returnedData.map(mapRowToUser);
-  } else if (returnedData && typeof returnedData === 'object' && !Array.isArray(returnedData) && Object.keys(returnedData).length > 0 && 'id' in returnedData) {
-    return [mapRowToUser(returnedData as any)];
-  } else if (insertResult.metadata && typeof insertResult.metadata === 'object') {
+  if (insertResult && Array.isArray(insertResult.results)) {
+    returnedData = insertResult.results;
+  } 
+  else if (Array.isArray(insertResult) && insertResult.length > 0 && typeof insertResult[0] === 'object') {
+    returnedData = insertResult;
+  }
+  else if (insertResult && typeof insertResult === 'object' && !Array.isArray(insertResult) && 'id' in insertResult) {
+    returnedData = [insertResult];
+  }
+  else if (insertResult && insertResult.metadata && typeof insertResult.metadata === 'object') {
     const meta = insertResult.metadata as any;
-    if (typeof meta.lastID === 'number' && meta.lastID > 0 && typeof meta.changes === 'number' && meta.changes > 0) {
+    if (typeof meta.lastID === 'number' && meta.lastID > 0 && (typeof meta.changes === 'number' && meta.changes > 0 || typeof meta.rowCount === 'number' && meta.rowCount > 0)) {
         const lastID = meta.lastID;
         const newUserQuery = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE id = $1";
-        const newUsers = await db.run_query(newUserQuery, [lastID]);
-        return newUsers.map(mapRowToUser);
-    } else if (typeof meta.rowCount === 'number' && meta.rowCount > 0) {
-        console.warn("createUser: Insert reported rowCount > 0 but no RETURNING data in results. Refetching might be needed if ID is not otherwise available.");
+        const refetchResult: any = await db.run_query(newUserQuery, [lastID]);
+        returnedData = Array.isArray(refetchResult) ? refetchResult : (refetchResult && Array.isArray(refetchResult.rows) ? refetchResult.rows : []);
+    } else {
+        console.warn("createUser: Insert metadata present but lastID or changes/rowCount not indicative of success:", meta);
     }
+  } else {
+    console.warn("createUser: db.run_insert returned an unexpected result structure or insert failed:", insertResult);
   }
-  console.warn("createUser: db.run_insert returned an unexpected result structure or insert failed:", insertResult);
-  return [];
+
+  return returnedData.map(mapRowToUser);
 };
 
-export const updateUserAvatar = async (userId: number, avatarUrl: string): Promise<User[] | any> => {
+export const updateUserAvatar = async (userId: number, avatarUrl: string): Promise<User[]> => {
   const query = "UPDATE users SET avatarurl = $1 WHERE id = $2 RETURNING id, username, email, dateregistered, firstname, lastname, about, avatarurl, roles, favourite_hotels";
-  const result = await db.run_query(query, [avatarUrl, userId]);
-  if (Array.isArray(result) && result.length > 0) {
-    return result.map(mapRowToUser);
-  }
-  return [];
+  const result: any = await db.run_query(query, [avatarUrl, userId]);
+  const rows = Array.isArray(result) ? result : (result && Array.isArray(result.rows) ? result.rows : []);
+  return rows.map(mapRowToUser);
 };
 
 const findUserByIdInternal = async (userId: number): Promise<User | null> => {
   const query = "SELECT id, username, email, password, passwordsalt, firstname, lastname, about, dateregistered, avatarurl, roles, favourite_hotels FROM users WHERE id = $1";
-  const rows = await db.run_query(query, [userId]);
-  if (rows && rows.length > 0) {
+  const result: any = await db.run_query(query, [userId]);
+  const rows = Array.isArray(result) ? result : (result && Array.isArray(result.rows) ? result.rows : []);
+  if (rows.length > 0) {
     return mapRowToUser(rows[0]);
   }
   return null;
@@ -140,7 +147,7 @@ export const addHotelToFavourites = async (userId: number, hotelCode: number): P
 
   let currentFavourites = user.favourite_hotels || [];
   if (!Array.isArray(currentFavourites)) {
-      console.warn(`User ${userId} favourite_hotels was not an array after parsing:`, currentFavourites);
+      console.warn(`User ${userId} favourite_hotels was not an array after internal fetch/parsing:`, currentFavourites, "Re-initializing to empty array.");
       currentFavourites = [];
   }
 
@@ -148,7 +155,8 @@ export const addHotelToFavourites = async (userId: number, hotelCode: number): P
     const updatedFavouritesArray = [...currentFavourites, hotelCode];
     const pgArrayString = `{${updatedFavouritesArray.join(',')}}`;
     const updateQuery = "UPDATE users SET favourite_hotels = $1 WHERE id = $2";
-    await db.run_update(updateQuery, [pgArrayString, userId]);
+    const updateResult: any = await db.run_update(updateQuery, [pgArrayString, userId]);
+    
     return findUserByIdInternal(userId);
   }
   return user;
@@ -163,7 +171,7 @@ export const removeHotelFromFavourites = async (userId: number, hotelCode: numbe
 
   let currentFavourites = user.favourite_hotels || [];
    if (!Array.isArray(currentFavourites)) {
-      console.warn(`User ${userId} favourite_hotels was not an array after parsing (remove):`, currentFavourites);
+      console.warn(`User ${userId} favourite_hotels was not an array after internal fetch/parsing (remove):`, currentFavourites, "Re-initializing to empty array.");
       currentFavourites = [];
   }
   
