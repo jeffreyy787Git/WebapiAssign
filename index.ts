@@ -9,7 +9,6 @@ import fs from 'fs';
 import path from 'path';
 import serve from 'koa-static';
 import mount from 'koa-mount';
-import { router as articles } from "./routes/articles";
 import { router as special } from "./routes/specials";
 import { router as authRoutes } from "./routes/auth";
 import { router as hotels } from "./routes/hotels";
@@ -49,7 +48,6 @@ app.use(passport.initialize());
 app.use(router.routes());
 app.use(authRoutes.routes()).use(authRoutes.allowedMethods());
 app.use(special.routes()).use(special.allowedMethods());
-app.use(articles.routes()).use(articles.allowedMethods());
 app.use(hotels.routes()).use(hotels.allowedMethods());
 app.use(messaging.routes()).use(messaging.allowedMethods());
 

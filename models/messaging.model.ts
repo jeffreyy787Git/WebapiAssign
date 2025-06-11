@@ -131,10 +131,8 @@ export const addMessageToThread = async (params: AddMessageParams): Promise<Thre
       last_message_at = NOW(),
       last_message_preview = $1,
       status = $2,
-      is_read_by_user = CASE WHEN $3 = TRUE THEN TRUE ELSE is_read_by_user END,   -- If sender is admin, set user_read to TRUE (user just sent this)
-      is_read_by_admin = CASE WHEN $4 = TRUE THEN TRUE ELSE is_read_by_admin END -- If sender is user, set admin_read to TRUE (admin just sent this)
-      -- More accurately: if user sends, admin needs to read it (is_read_by_admin = FALSE)
-      -- if admin sends, user needs to read it (is_read_by_user = FALSE)
+      is_read_by_user = CASE WHEN $3 = TRUE THEN TRUE ELSE is_read_by_user END,
+      is_read_by_admin = CASE WHEN $4 = TRUE THEN TRUE ELSE is_read_by_admin END
     WHERE id = $5;
   `;
   
@@ -142,11 +140,11 @@ export const addMessageToThread = async (params: AddMessageParams): Promise<Thre
     UPDATE message_threads
     SET 
       last_message_at = NOW(),
-      last_message_preview = $1, -- content preview
-      status = $2, -- new status (e.g. pending_user or pending_admin)
-      is_read_by_user = $3, -- target value for is_read_by_user
-      is_read_by_admin = $4 -- target value for is_read_by_admin
-    WHERE id = $5; -- threadId
+      last_message_preview = $1,
+      status = $2,
+      is_read_by_user = $3,
+      is_read_by_admin = $4
+    WHERE id = $5;
   `;
 
   const newReadByUser = !senderIsAdmin; 
