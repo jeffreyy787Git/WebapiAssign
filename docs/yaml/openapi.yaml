@@ -1,11 +1,11 @@
 openapi: 3.0.0
 info:   
   version: 1.0.0   
-  title: Back End Demonstration API
-  description: A simple blog API.
+  title: Back End Assignment API
+  description: A simple hotel API.
   contact:     
-    name: CY Cheng
-    email: cycheng@vtc.edu.hk
+    name: Chan Wing Chung
+    email: 247041061@stu.vtc.edu.hk
   license:
     name: Apache 2.0
     url: 'https://www.apache.org/licenses/LICENSE-2.0.html'

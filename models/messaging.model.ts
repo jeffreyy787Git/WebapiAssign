@@ -80,7 +80,7 @@ export const createThread = async (params: CreateThreadParams): Promise<MessageT
   const messageQuery = `
     INSERT INTO thread_messages (thread_id, sender_id, sender_username, content, created_at)
     VALUES ($1, $2, $3, $4, NOW())
-    RETURNING id; // Only need ID to confirm, or could return more if needed elsewhere
+    RETURNING id;
   `;
   const initialMessageInsertResult: any = await db.run_insert(messageQuery, [newThread.id, userId, userUsername, initialMessageContent]);
   if (!initialMessageInsertResult || 
@@ -103,7 +103,7 @@ export const addMessageToThread = async (params: AddMessageParams): Promise<Thre
   const messageQuery = `
     INSERT INTO thread_messages (thread_id, sender_id, sender_username, content, created_at)
     VALUES ($1, $2, $3, $4, NOW())
-    RETURNING *; // Return all fields of the new message
+    RETURNING *;
   `;
   const messageInsertResult: any = await db.run_insert(messageQuery, [threadId, senderId, senderUsername, content]);
 

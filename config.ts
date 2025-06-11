@@ -8,5 +8,3 @@ export const config = {
   database: "postgres",
   connection_limit: 100
 }
-
-// https://www.postgresql.org/download/windows/

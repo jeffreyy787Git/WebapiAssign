@@ -12,7 +12,6 @@ import mount from 'koa-mount';
 import { router as articles } from "./routes/articles";
 import { router as special } from "./routes/specials";
 import { router as authRoutes } from "./routes/auth";
-import { router as proxy} from "./routes/proxy";
 import { router as hotels } from "./routes/hotels";
 import { router as messaging } from "./routes/messaging";
 
@@ -51,7 +50,6 @@ app.use(router.routes());
 app.use(authRoutes.routes()).use(authRoutes.allowedMethods());
 app.use(special.routes()).use(special.allowedMethods());
 app.use(articles.routes()).use(articles.allowedMethods());
-app.use(proxy.routes()).use(proxy.allowedMethods());
 app.use(hotels.routes()).use(hotels.allowedMethods());
 app.use(messaging.routes()).use(messaging.allowedMethods());
 
